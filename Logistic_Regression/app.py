@@ -58,13 +58,37 @@ st.markdown(
     [data-testid="stSidebar"] label { color: var(--ink); }
     [data-testid="stTabs"] button { color: var(--muted); }
     [data-testid="stTabs"] button[aria-selected="true"] { color: var(--green-dark); }
-    [data-baseweb="input"] input,
-    [data-baseweb="select"] *,
-    [data-baseweb="textarea"] textarea { color: var(--ink); }
-    [data-baseweb="input"] > div,
-    [data-baseweb="select"] > div { background-color: #ffffff; border-color: var(--line); }
-    [data-testid="stBaseButton-primary"] { background: var(--green); border-color: var(--green); color: #ffffff; }
-    [data-testid="stBaseButton-primary"]:hover { background: var(--green-dark); border-color: var(--green-dark); color: #ffffff; }
+    [data-testid="stNumberInputContainer"],
+    [data-testid="stTextInputRootElement"],
+    [data-testid="stSelectbox"] [data-baseweb="select"] > div {
+        background-color: #e5ede6 !important; border-color: var(--line) !important;
+    }
+    [data-testid="stNumberInputContainer"] input,
+    [data-testid="stTextInputRootElement"] input,
+    [data-testid="stSelectbox"] [data-baseweb="select"] * { color: var(--ink) !important; }
+    [data-testid="stNumberInputContainer"] button { background-color: #e5ede6; color: var(--ink); }
+    [data-testid="stBaseButton-primary"],
+    [data-testid="stBaseButton-primaryFormSubmit"] {
+        background: var(--green-dark) !important; border-color: var(--green-dark) !important; color: #ffffff !important;
+    }
+    [data-testid="stBaseButton-primaryFormSubmit"] p { color: #ffffff !important; }
+    [data-testid="stBaseButton-primary"]:hover,
+    [data-testid="stBaseButton-primaryFormSubmit"]:hover {
+        background: var(--green-dark) !important; border-color: var(--green-dark) !important; color: #ffffff !important;
+    }
+    .st-key-_visitor_profile_Male [data-testid="stSelectbox"] .react-aria-ComboBox > div {
+        background-color: var(--green-dark) !important; border-color: var(--green-dark) !important;
+    }
+    .st-key-_visitor_profile_Male [role="combobox"],
+    .st-key-_visitor_profile_Male button,
+    .st-key-_visitor_profile_Male svg { color: #ffffff !important; }
+    [data-testid="stFileUploaderDropzone"] { background: #ffffff; border: 1px dashed var(--line); }
+    [data-testid="stFileUploaderDropzone"] * { color: var(--muted); }
+    [data-testid="stFileUploaderDropzone"] button {
+        background: #ffffff !important; border-color: var(--line) !important; color: var(--ink) !important;
+    }
+    [data-testid="stFileUploaderDropzone"] button p { color: var(--ink) !important; }
+    [data-testid="stFileUploaderDropzone"] [data-testid="stIconMaterial"] { display: none !important; }
     :focus-visible { outline: 3px solid #d06a43 !important; outline-offset: 2px; }
     .eyebrow { color: var(--green-dark); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; }
     </style>
@@ -130,20 +154,26 @@ model = fit_logistic_model(X_train, y_train)
 predictions = model.predict(X_test)
 report = classification_report(y_test, predictions, output_dict=True, zero_division=0)
 
-st.markdown('<p class="eyebrow">Campaign analytics / Classification</p>', unsafe_allow_html=True)
-st.title("Who clicks on an ad?")
-st.caption("Explore the advertising audience, review model performance, and score a visitor profile.")
-
 click_rate = target.mean() * 100
-metric_columns = st.columns(4)
-metric_columns[0].metric("Visitors", f"{len(data):,}")
-metric_columns[1].metric("Click-through rate", f"{click_rate:.1f}%")
-metric_columns[2].metric("Model accuracy", f"{report['accuracy']:.1%}")
-metric_columns[3].metric("Test observations", f"{len(y_test):,}")
 
-overview_tab, explore_tab, model_tab = st.tabs(["Overview", "Explore", "Model & predict"])
+def render_header(title: str, description: str) -> None:
+    st.markdown('<p class="eyebrow">Campaign analytics / Classification</p>', unsafe_allow_html=True)
+    st.title(title)
+    st.caption(description)
 
-with overview_tab:
+
+def save_explore_feature() -> None:
+    st.session_state["explore_selected_feature"] = st.session_state["_explore_selected_feature"]
+
+
+def render_overview() -> None:
+    render_header("Who clicks on an ad?", "A snapshot of the advertising audience and campaign response.")
+    metric_columns = st.columns(4)
+    metric_columns[0].metric("Visitors", f"{len(data):,}")
+    metric_columns[1].metric("Click-through rate", f"{click_rate:.1f}%")
+    metric_columns[2].metric("Model accuracy", f"{report['accuracy']:.1%}")
+    metric_columns[3].metric("Test observations", f"{len(y_test):,}")
+
     left_column, right_column = st.columns([1.15, 0.85], gap="large")
     with left_column:
         st.subheader("Audience snapshot")
@@ -163,7 +193,9 @@ with overview_tab:
         st.pyplot(figure, width="stretch")
         plt.close(figure)
 
-with explore_tab:
+
+def render_explore() -> None:
+    render_header("Explore the audience", "Compare visitor behavior and feature distributions by ad response.")
     chart_column, scatter_column = st.columns(2, gap="large")
     with chart_column:
         st.subheader("Age by click outcome")
@@ -192,7 +224,16 @@ with explore_tab:
         st.pyplot(figure, width="stretch")
         plt.close(figure)
     st.subheader("Feature relationships")
-    selected_x = st.selectbox("Compare a feature", FEATURES, index=0)
+    if "_explore_selected_feature" not in st.session_state:
+        st.session_state["_explore_selected_feature"] = st.session_state.get(
+            "explore_selected_feature", FEATURES[0]
+        )
+    selected_x = st.selectbox(
+        "Compare a feature",
+        FEATURES,
+        key="_explore_selected_feature",
+        on_change=save_explore_feature,
+    )
     figure, axis = plt.subplots(figsize=(10, 4.2))
     sns.boxplot(data=data, x=TARGET, y=selected_x, hue=TARGET, legend=False, ax=axis)
     axis.set_xlabel("Clicked on ad (0 = no, 1 = yes)")
@@ -201,7 +242,9 @@ with explore_tab:
     st.pyplot(figure, width="stretch")
     plt.close(figure)
 
-with model_tab:
+
+def render_model_performance() -> None:
+    render_header("Model performance", "Review how logistic regression classifies held-out visitors.")
     st.subheader("Test-set performance")
     score_column, matrix_column = st.columns([1, 1], gap="large")
     with score_column:
@@ -233,9 +276,11 @@ with model_tab:
         st.pyplot(figure, width="stretch")
         plt.close(figure)
 
-    st.divider()
-    st.subheader("Score a visitor")
-    st.caption("Enter visitor attributes to estimate the probability of an ad click.")
+
+def render_visitor_scoring() -> None:
+    render_header("Score a visitor", "Estimate the probability that a visitor will click an ad.")
+    st.caption("Model: logistic regression · Inputs: site time, age, area income, internet use, and gender flag")
+    saved_values = st.session_state.get("visitor_profile_values", {})
     with st.form("visitor_profile"):
         input_columns = st.columns(3)
         visitor_values = {}
@@ -243,26 +288,56 @@ with model_tab:
             minimum = float(data[feature].min())
             maximum = float(data[feature].max())
             default = float(data[feature].median())
+            widget_key = f"_visitor_profile_{feature}"
+            if widget_key not in st.session_state:
+                initial_value = saved_values.get(feature, 0 if feature == "Male" else default)
+                if feature == "Age":
+                    initial_value = min(max(int(initial_value), int(minimum)), int(maximum))
+                elif feature == "Male":
+                    initial_value = int(initial_value) if int(initial_value) in (0, 1) else 0
+                else:
+                    initial_value = min(max(float(initial_value), minimum), maximum)
+                st.session_state[widget_key] = initial_value
+
             if feature == "Male":
                 visitor_values[feature] = input_columns[index % 3].selectbox(
-                    "Male", options=[0, 1], format_func=lambda value: "Yes" if value else "No"
+                    "Male",
+                    options=[0, 1],
+                    format_func=lambda value: "Yes" if value else "No",
+                    key=widget_key,
                 )
             elif feature == "Age":
+                age_minimum = int(minimum)
+                age_maximum = int(maximum)
+                current_age = int(st.session_state[widget_key])
+                if current_age < age_minimum or current_age > age_maximum:
+                    st.session_state[widget_key] = min(max(current_age, age_minimum), age_maximum)
                 visitor_values[feature] = input_columns[index % 3].number_input(
-                    "Age", min_value=int(minimum), max_value=int(maximum), value=int(default), step=1
+                    "Age",
+                    min_value=age_minimum,
+                    max_value=age_maximum,
+                    step=1,
+                    key=widget_key,
                 )
             else:
+                current_value = float(st.session_state[widget_key])
+                if current_value < minimum or current_value > maximum:
+                    st.session_state[widget_key] = min(max(current_value, minimum), maximum)
                 visitor_values[feature] = input_columns[index % 3].number_input(
                     feature,
                     min_value=minimum,
                     max_value=maximum,
-                    value=default,
                     step=0.5 if feature != "Area Income" else 100.0,
+                    key=widget_key,
                 )
         submitted = st.form_submit_button("Estimate click likelihood", type="primary")
 
     if submitted:
-        visitor = pd.DataFrame([visitor_values], columns=FEATURES)
+        st.session_state["visitor_profile_values"] = visitor_values.copy()
+
+    saved_values = st.session_state.get("visitor_profile_values")
+    if saved_values:
+        visitor = pd.DataFrame([saved_values], columns=FEATURES)
         probability = float(model.predict_proba(visitor)[0, 1])
         prediction = int(probability >= 0.5)
         result_column, probability_column = st.columns([1, 2])
@@ -272,4 +347,13 @@ with model_tab:
             st.metric("Estimated click probability", f"{probability:.1%}")
         st.progress(probability)
 
-st.caption("Model: logistic regression · Inputs: site time, age, area income, internet use, and gender flag")
+
+navigation = st.navigation(
+    [
+        st.Page(render_overview, title="Overview"),
+        st.Page(render_explore, title="Explore"),
+        st.Page(render_model_performance, title="Model performance"),
+        st.Page(render_visitor_scoring, title="Score a visitor"),
+    ]
+)
+navigation.run()
